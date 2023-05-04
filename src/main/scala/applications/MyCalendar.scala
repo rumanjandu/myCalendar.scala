@@ -115,20 +115,24 @@ object MyCalendar {
    * }}}
    * @return A sequence of events.
    */
-  def readEventsFromFile(filename: String): Seq[Event] =
+  def readEventsFromFile(filename: String): Seq[Event] = {
     import java.io.File
     import scala.io.{BufferedSource, Source}
+
     val fileHandle: BufferedSource = Source.fromFile(filename)
     val lines: Seq[String] = fileHandle.getLines.toList
     fileHandle.close()
-    for
+
+    for {
       line <- lines
       if line.nonEmpty
-    yield
-      val (datetime, description) = line.split("\\s+").toList.splitAt(5)
-      val (List(year, month, day), List(hour, minute)) = datetime map (_.toInt) splitAt 3
-      Event(Date(year, month, day), Time(hour, minute), description.mkString(" "))
-  
+    } yield {
+      val datetime = line.split("\\s+").toList.take(5).map(_.toInt)
+      Event(Date(datetime(0), datetime(1), datetime(2)), Time(datetime(3), datetime(4)), "")
+    }
+  }
+
+
   /**
    * A method to make up random diary events.  Useful for testing.
    * N.B. It over-writes the file at EventsPath
@@ -173,49 +177,51 @@ object MyCalendar {
    *         month in the given year.
    */
   def displayMonth(year: Int, month: Int, events: Seq[Event]): Picture = {
-    // Add code here to construct the calendar month picture
-
-    // 1. Filter the events to those relevant for the given month and year
+    // Filter the events to those relevant for the given month and year
     val relevantEvents = events.filter(e => e.date.year == year && e.date.month == month)
 
-    // 2. Create a ListBuffer to store the lines of the calendar
+    // Create a ListBuffer to store the lines of the calendar
     val lines = ListBuffer[String]()
 
-    // 3. Add the month and year as the first line
+    // Add the month and year as the first line
     lines.append(s"${getMonthName(month)} $year")
 
-    // 4. Add the days of the week as the second line
-    lines.append("Sun Mon Tue Wed Thu Fri Sat")
+    // Add the days of the week as the second line
+    val dayNames = Seq("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+    val paddedDayNames = dayNames.map(_.padTo(6, ' '))
+    lines.append(paddedDayNames.mkString(""))
 
-    // 5. Add a line separator
-    lines.append("----------------------------")
+    // Add a line separator
+    lines.append("----------------------------------------------")
 
-    // 6. Calculate the number of days in the given month
+    // Calculate the number of days in the given month
     val numDays = getNumDaysInMonth(year, month)
 
-    // 7. Calculate the day of the week for the first day of the month
+    // Calculate the day of the week for the first day of the month
     val firstDayOfWeek = getFirstDayOfWeek(year, month)
 
-    // 8. Initialize a counter for the days of the month
+    // Initialize a counter for the days of the month
     var dayCounter = 1
 
-    // 9. Loop through each row of the calendar
+    // Loop through each row of the calendar
     for (i <- 0 until 6) {
       var line = ""
 
-      // 10. Loop through each column of the calendar
+      // Loop through each column of the calendar
       for (j <- 0 until 7) {
-        // 11. Calculate the index of the current day in the calendar
+        // Calculate the index of the current day in the calendar
         val index = i * 7 + j
 
-        // 12. Add spaces for days before the first day of the month
+        // Add spaces for days before the first day of the month
         if (index < firstDayOfWeek) {
           line += "      "
         } else {
-          // 13. Add the day number and pad with spaces
+          // Add the day number and pad with spaces
           if (dayCounter <= numDays) {
             val day = f"$dayCounter%2d"
-            line += s" $day |"
+            // Add events for the current day
+            val dayEvents = relevantEvents.filter(_.date.day == dayCounter)
+            line += s" $day${if (dayEvents.nonEmpty) "*" else " "} |"
             dayCounter += 1
           } else {
             line += "      "
@@ -223,18 +229,31 @@ object MyCalendar {
         }
       }
 
-      // 14. Add the line to the list of lines
+      // Add the line to the list of lines
       lines.append(line)
 
-      // 15. Add a line separator after each row
+      // Add event descriptions below the calendar
+      if (i == 0 && relevantEvents.nonEmpty) {
+        val maxEventWidth = 21 // maximum width of event description
+        val eventsStr = relevantEvents.map(e => s"${e.date.day}").mkString(", ")
+/*        val eventsLine = "Events: " + eventsStr
+        val eventsLinePadded = eventsLine.padTo(30, ' ')
+        lines.append(eventsLinePadded)*/
+      }
+
+      // Add a line separator after each row
       if (i < 5) {
-        lines.append("------------------------------------")
+        lines.append("----------------------------------------------")
       }
     }
 
-    // 16. Create a Picture object with the content of the calendar
+    // Create a Picture object with the content of the calendar
     Picture(lines.mkString("\n"))
   }
+
+
+
+
 
   // Helper functions
 
@@ -251,8 +270,8 @@ object MyCalendar {
   }
 
   def getNumDaysInMonth(year: Int, month: Int): Int = {
-    val daysInMonth = Seq(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
-    val daysInFebruary = if (isLeapYear(year)) 29 else 28
+    val daysInMonth = Seq(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31) // for non-leap years
+    val daysInFebruary = if (isLeapYear(year)) 29 else 28 // for leap years
     if (month == 2) daysInFebruary else daysInMonth(month - 1)
   }
 
